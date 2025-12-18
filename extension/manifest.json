@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Local Bookmarks",
+  "name": "MookBarked",
   "version": "1.0.0",
   "description": "Save articles and videos as GitHub Issues with secure local credential storage",
   
