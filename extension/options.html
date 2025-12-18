@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookmarks Extension - Settings</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      color: #333;
+    }
+    
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle {
+      color: #5f6368;
+      margin-bottom: 32px;
+    }
+    
+    .section {
+      background: #f8f9fa;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    
+    .section h2 {
+      font-size: 16px;
+      margin-top: 0;
+      margin-bottom: 16px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #555;
+    }
+    
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #1a73e8;
+    }
+    
+    .help-text {
+      font-size: 13px;
+      color: #5f6368;
+      margin-top: 4px;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .primary-btn {
+      background: #1a73e8;
+      color: white;
+    }
+    
+    .primary-btn:hover {
+      background: #1557b0;
+    }
+    
+    .secondary-btn {
+      background: white;
+      color: #5f6368;
+      border: 1px solid #dadce0;
+    }
+    
+    .secondary-btn:hover {
+      background: #f8f9fa;
+    }
+    
+    .danger-btn {
+      background: #ea4335;
+      color: white;
+    }
+    
+    .danger-btn:hover {
+      background: #c5221f;
+    }
+    
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .status {
+      padding: 12px;
+      border-radius: 4px;
+      margin-top: 16px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .status.success {
+      background: #e6f4ea;
+      color: #137333;
+      border: 1px solid #b7e1cd;
+    }
+    
+    .status.error {
+      background: #fce8e6;
+      color: #c5221f;
+      border: 1px solid #f5b9b4;
+    }
+    
+    .status.info {
+      background: #e8f0fe;
+      color: #1967d2;
+      border: 1px solid #aecbfa;
+    }
+    
+    .health-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: white;
+      border: 1px solid #dadce0;
+      border-radius: 4px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+    
+    .health-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    
+    .health-dot.healthy {
+      background: #34a853;
+    }
+    
+    .health-dot.unhealthy {
+      background: #ea4335;
+    }
+    
+    .health-dot.checking {
+      background: #fbbc04;
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .code {
+      background: #f1f3f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+    }
+    
+    .link {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    
+    .link:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <h1>Bookmarks Extension Settings</h1>
+  <p class="subtitle">Configure your GitHub repository and credentials</p>
+  
+  <!-- Connection Status -->
+  <div class="health-indicator" id="healthIndicator">
+    <div class="health-dot checking" id="healthDot"></div>
+    <span id="healthText">Checking connection...</span>
+  </div>
+  
+  <!-- GitHub Configuration -->
+  <div class="section">
+    <h2>GitHub Repository</h2>
+    
+    <div class="form-group">
+      <label for="githubOwner">GitHub Username/Organization</label>
+      <input type="text" id="githubOwner" placeholder="your-username">
+      <div class="help-text">Your GitHub username (e.g., "octocat")</div>
+    </div>
+    
+    <div class="form-group">
+      <label for="githubRepo">Repository Name</label>
+      <input type="text" id="githubRepo" placeholder="my-bookmarks">
+      <div class="help-text">The repository where bookmarks will be stored as issues</div>
+    </div>
+    
+    <div class="button-group">
+      <button class="primary-btn" id="saveRepoBtn">Save Repository Settings</button>
+    </div>
+    
+    <div class="status" id="repoStatus"></div>
+  </div>
+  
+  <!-- PAT Management -->
+  <div class="section">
+    <h2>Personal Access Token (PAT)</h2>
+    
+    <div class="form-group">
+      <label for="pat">GitHub Personal Access Token</label>
+      <input type="password" id="pat" placeholder="ghp_xxxxxxxxxxxx">
+      <div class="help-text">
+        Create a PAT at <a href="https://github.com/settings/tokens/new" target="_blank" class="link">github.com/settings/tokens</a> 
+        with <span class="code">repo</span> scope for public repositories or <span class="code">public_repo</span> scope.
+      </div>
+    </div>
+    
+    <div class="button-group">
+      <button class="primary-btn" id="storePATBtn">Save PAT</button>
+      <button class="secondary-btn" id="testPATBtn">Test Connection</button>
+      <button class="danger-btn" id="removePATBtn">Remove PAT</button>
+    </div>
+    
+    <div class="status" id="patStatus"></div>
+  </div>
+  
+  <!-- Security Info -->
+  <div class="section">
+    <h2>Security</h2>
+    <p style="font-size: 14px; line-height: 1.6; margin: 0;">
+      Your Personal Access Token is stored securely in your operating system's keychain/credential manager.
+      It is never stored in the browser or extension storage. The native messaging host (a local program) 
+      retrieves the token only when creating bookmarks.
+    </p>
+  </div>
+  
+  <!-- Instructions -->
+  <div class="section">
+    <h2>Quick Start Guide</h2>
+    <ol style="font-size: 14px; line-height: 1.8; padding-left: 20px;">
+      <li>Create a public GitHub repository for your bookmarks</li>
+      <li>Generate a Personal Access Token with <span class="code">repo</span> or <span class="code">public_repo</span> scope</li>
+      <li>Enter your GitHub username and repository name above</li>
+      <li>Paste and save your PAT</li>
+      <li>Click "Test Connection" to verify everything works</li>
+      <li>Start bookmarking! Click the extension icon on any page</li>
+    </ol>
+  </div>
+  
+  <script src="options.js"></script>
+</body>
+</html>
