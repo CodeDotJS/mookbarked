@@ -574,5 +574,111 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/**
+ * Save all tabs in current window
+ */
+async function saveAllTabs() {
+  const saveAllBtn = document.getElementById('saveAllTabsBtn');
+  saveAllBtn.disabled = true;
+  saveAllBtn.textContent = 'Saving...';
+  
+  try {
+    // Get all tabs in current window
+    const tabs = await chrome.tabs.query({ currentWindow: true });
+    
+    if (tabs.length === 0) {
+      showStatus('No tabs to save', 'error');
+      saveAllBtn.disabled = false;
+      saveAllBtn.textContent = 'Mook All Tabs';
+      return;
+    }
+    
+    // Get default tags
+    const result = await chrome.storage.local.get(['defaultTags']);
+    const defaultTags = result.defaultTags || [];
+    
+    let saved = 0;
+    let skipped = 0;
+    let errors = 0;
+    
+    showStatus(`Saving ${tabs.length} tabs...`, 'loading');
+    
+    // Save each tab
+    for (const tab of tabs) {
+      try {
+        // Skip chrome:// and extension:// pages
+        if (tab.url.startsWith('chrome://') || tab.url.startsWith('chrome-extension://') || tab.url.startsWith('edge://')) {
+          skipped++;
+          continue;
+        }
+        
+        // Check for duplicates
+        const existingIssue = await checkUrlExists(tab.url);
+        if (existingIssue) {
+          skipped++;
+          continue;
+        }
+        
+        // Detect provider and type
+        const provider = await detectProvider(tab.url);
+        const type = await detectType(tab.url);
+        
+        const bookmark = {
+          title: tab.title || tab.url,
+          url: tab.url,
+          type: type,
+          provider: provider,
+          notes: '',
+          tags: defaultTags
+        };
+        
+        // Save bookmark
+        const response = await chrome.runtime.sendMessage({
+          action: 'createBookmark',
+          data: bookmark
+        });
+        
+        if (response.success) {
+          saved++;
+          // Add to cache
+          chrome.runtime.sendMessage({
+            action: 'cacheBookmark',
+            url: tab.url,
+            issue: response.issue
+          });
+        } else {
+          errors++;
+        }
+      } catch (error) {
+        console.error('Error saving tab:', tab.url, error);
+        errors++;
+      }
+    }
+    
+    // Show results
+    const message = `Saved: ${saved}, Skipped: ${skipped}, Errors: ${errors}`;
+    showStatus(message, saved > 0 ? 'success' : 'error');
+    
+    saveAllBtn.textContent = 'Mook All Tabs';
+    saveAllBtn.disabled = false;
+    
+    // Close popup after 3 seconds if successful
+    if (saved > 0) {
+      setTimeout(() => {
+        window.close();
+      }, 3000);
+    }
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, 'error');
+    saveAllBtn.disabled = false;
+    saveAllBtn.textContent = 'Mook All Tabs';
+  }
+}
+
 // Initialize when popup opens
-document.addEventListener('DOMContentLoaded', initializePopup);
+document.addEventListener('DOMContentLoaded', () => {
+  initializePopup();
+  
+  // Setup save all tabs button
+  document.getElementById('saveAllTabsBtn').addEventListener('click', saveAllTabs);
+});
