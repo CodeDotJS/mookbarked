@@ -294,6 +294,46 @@ function detectType(url) {
   return 'article';
 }
 
+/**
+ * Delete a GitHub Issue
+ * @param {number} issueNumber - Issue number to delete
+ * @returns {Promise<Object>} Deletion result
+ */
+async function deleteGitHubIssue(issueNumber) {
+  // Get PAT from native host
+  const pat = await getPAT();
+  
+  // Get GitHub config
+  const config = await getGitHubConfig();
+  
+  if (!config.owner || !config.repo) {
+    throw new Error('GitHub repository not configured.');
+  }
+  
+  // Close the issue (GitHub doesn't allow deleting issues, only closing)
+  const response = await fetch(
+    `https://api.github.com/repos/${config.owner}/${config.repo}/issues/${issueNumber}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${pat}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body: JSON.stringify({
+        state: 'closed'
+      })
+    }
+  );
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`GitHub API error (${response.status}): ${error.message || 'Unknown error'}`);
+  }
+  
+  return response.json();
+}
+
 // Message handler
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'createBookmark') {
@@ -368,6 +408,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => {
         console.error('Error checking URL:', error);
         sendResponse({ exists: false, error: error.message });
+      });
+    return true;
+  }
+  
+  if (request.action === 'deleteBookmark') {
+    // Delete (close) a bookmark issue
+    deleteGitHubIssue(request.issueNumber)
+      .then((result) => {
+        sendResponse({ success: true, result: result });
+      })
+      .catch((error) => {
+        console.error('Error deleting bookmark:', error);
+        sendResponse({ success: false, error: error.message });
       });
     return true;
   }

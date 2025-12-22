@@ -214,6 +214,32 @@ async function checkUrlExists(url) {
 }
 
 /**
+ * Undo last save (delete the issue)
+ * @param {number} issueNumber - Issue number to delete
+ */
+async function undoLastSave(issueNumber) {
+  showStatus('Deleting bookmark...', 'loading');
+  
+  try {
+    const response = await chrome.runtime.sendMessage({
+      action: 'deleteBookmark',
+      issueNumber: issueNumber
+    });
+    
+    if (response.success) {
+      showStatus('✓ Bookmark deleted', 'success');
+      setTimeout(() => {
+        window.close();
+      }, 1500);
+    } else {
+      showStatus(`✗ Error: ${response.error}`, 'error');
+    }
+  } catch (error) {
+    showStatus(`✗ Error: ${error.message}`, 'error');
+  }
+}
+
+/**
  * Handle form submission
  */
 document.getElementById('bookmarkForm').addEventListener('submit', async (e) => {
@@ -278,17 +304,28 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
     });
     
     if (response.success) {
-      showStatus('✓ Bookmark saved successfully!', 'success');
+      const issueNumber = response.issue.number;
+      const issueUrl = response.issue.html_url;
+      
+      // Show success with undo option
+      const undoMessage = `✓ Bookmark saved! <a href="#" id="undoLink" style="color: #166534; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Undo</a>`;
+      showStatus(undoMessage, 'success', true);
+      
+      // Setup undo handler
+      document.getElementById('undoLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await undoLastSave(issueNumber);
+      });
       
       // Clear form fields
       document.getElementById('notes').value = '';
       tags = [];
       renderTags();
       
-      // Close popup after 1.5 seconds
+      // Close popup after 3 seconds (longer to allow undo)
       setTimeout(() => {
         window.close();
-      }, 1500);
+      }, 5000);
     } else {
       showStatus(`✗ Error: ${response.error}`, 'error');
       saveBtn.disabled = false;
