@@ -397,6 +397,94 @@ ${bookmark.notes || ''}`;
 }
 
 /**
+ * Parse YAML frontmatter from issue body
+ * @param {string} body - Issue body text
+ * @returns {Object|null} Parsed metadata and content
+ */
+function parseYAMLFrontmatter(body) {
+  if (!body) return null;
+  
+  const match = body.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+  if (!match) return null;
+  
+  const yaml = match[1];
+  const content = match[2].trim();
+  
+  // Simple YAML parser
+  const metadata = {};
+  yaml.split('\n').forEach(line => {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) return;
+    
+    const key = line.substring(0, colonIndex).trim();
+    let value = line.substring(colonIndex + 1).trim();
+    
+    // Remove quotes
+    value = value.replace(/^["']|["']$/g, '');
+    
+    if (key && value) {
+      metadata[key] = value;
+    }
+  });
+  
+  return { metadata, content };
+}
+
+/**
+ * Get bookmark data from GitHub issue
+ * @param {number} issueNumber - Issue number
+ * @returns {Promise<Object>} Bookmark data
+ */
+async function getBookmarkFromIssue(issueNumber) {
+  const pat = await getPAT();
+  const config = await getGitHubConfig();
+  
+  if (!config.owner || !config.repo) {
+    throw new Error('GitHub repository not configured.');
+  }
+  
+  const response = await fetch(
+    `https://api.github.com/repos/${config.owner}/${config.repo}/issues/${issueNumber}`,
+    {
+      headers: {
+        'Authorization': `token ${pat}`,
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(`GitHub API error (${response.status}): ${error.message || 'Unknown error'}`);
+  }
+  
+  const issue = await response.json();
+  const parsed = parseYAMLFrontmatter(issue.body);
+  
+  if (!parsed) {
+    throw new Error('Could not parse bookmark data from issue');
+  }
+  
+  // Extract tags from labels (exclude type label)
+  const tags = issue.labels
+    .map(label => label.name)
+    .filter(label => label !== 'article' && label !== 'video');
+  
+  // Determine type from labels
+  const type = issue.labels.some(l => l.name === 'video') ? 'video' : 'article';
+  
+  return {
+    title: issue.title,
+    url: parsed.metadata.url || '',
+    type: type,
+    provider: parsed.metadata.provider || 'Article',
+    notes: parsed.content || '',
+    tags: tags,
+    issueNumber: issue.number
+  };
+}
+
+/**
  * Detect provider from URL
  * @param {string} url - Page URL
  * @returns {string} Provider name
@@ -639,6 +727,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     addToCache(request.url, request.issue);
     sendResponse({ success: true });
     return false;
+  }
+  
+  if (request.action === 'getBookmark') {
+    // Get bookmark data from issue
+    getBookmarkFromIssue(request.issueNumber)
+      .then((bookmark) => {
+        sendResponse({ success: true, bookmark: bookmark });
+      })
+      .catch((error) => {
+        console.error('Error getting bookmark:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
   }
 });
 
