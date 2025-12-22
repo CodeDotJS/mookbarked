@@ -108,6 +108,101 @@ async function getGitHubConfig() {
 }
 
 /**
+ * Check if URL already exists in GitHub issues
+ * @param {string} url - URL to check
+ * @returns {Promise<Object|null>} Existing issue if found, null otherwise
+ */
+async function checkUrlExists(url) {
+  try {
+    const pat = await getPAT();
+    const config = await getGitHubConfig();
+    
+    if (!config.owner || !config.repo) {
+      return null;
+    }
+    
+    // Search through issues to find matching URL
+    // We'll check the first few pages of issues
+    let page = 1;
+    const perPage = 100;
+    const maxPages = 5; // Limit to 5 pages to avoid too many API calls
+    
+    while (page <= maxPages) {
+      const response = await fetch(
+        `https://api.github.com/repos/${config.owner}/${config.repo}/issues?state=all&per_page=${perPage}&page=${page}&sort=updated&direction=desc`,
+        {
+          headers: {
+            'Authorization': `token ${pat}`,
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        break;
+      }
+      
+      const issues = await response.json();
+      
+      // Check each issue's body for the URL
+      for (const issue of issues) {
+        if (issue.pull_request) continue; // Skip pull requests
+        
+        if (!issue.body) continue;
+        
+        // Normalize URLs for comparison
+        const normalizedUrl = url.trim();
+        const normalizedUrlNoTrailing = normalizedUrl.replace(/\/$/, '');
+        
+        // Extract URL from frontmatter - match the exact format used when saving
+        // Format is: url: "URL" (with double quotes)
+        const frontmatterRegex = /^---\s*\n[\s\S]*?url:\s*"([^"]+)"[\s\S]*?---/m;
+        const frontmatterMatch = issue.body.match(frontmatterRegex);
+        
+        if (frontmatterMatch) {
+          const existingUrl = frontmatterMatch[1].trim();
+          const existingUrlNoTrailing = existingUrl.replace(/\/$/, '');
+          
+          // Compare both with and without trailing slash
+          if (existingUrl === normalizedUrl || 
+              existingUrl === normalizedUrlNoTrailing ||
+              existingUrlNoTrailing === normalizedUrl ||
+              existingUrlNoTrailing === normalizedUrlNoTrailing) {
+            return issue;
+          }
+        }
+        
+        // Fallback: check if URL appears in url: field with various quote styles
+        const urlFieldPatterns = [
+          `url: "${normalizedUrl}"`,
+          `url: "${normalizedUrlNoTrailing}"`,
+          `url: ${normalizedUrl}`,
+          `url: ${normalizedUrlNoTrailing}`
+        ];
+        
+        for (const pattern of urlFieldPatterns) {
+          if (issue.body.includes(pattern)) {
+            return issue;
+          }
+        }
+      }
+      
+      // If we got fewer issues than perPage, we've reached the end
+      if (issues.length < perPage) {
+        break;
+      }
+      
+      page++;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error checking URL existence:', error);
+    return null; // Return null on error to allow saving
+  }
+}
+
+/**
  * Create a GitHub Issue (bookmark)
  * @param {Object} bookmark - Bookmark data
  * @returns {Promise<Object>} Created issue
@@ -132,8 +227,19 @@ date_saved: "${new Date().toISOString()}"
 ---
 ${bookmark.notes || ''}`;
   
-  // Determine label
+  // Determine labels - include type and tags
   const labels = [bookmark.type]; // 'article' or 'video'
+  
+  // Add tags as labels if provided
+  if (bookmark.tags && Array.isArray(bookmark.tags) && bookmark.tags.length > 0) {
+    // Filter out empty tags and add to labels
+    bookmark.tags.forEach(tag => {
+      const trimmedTag = tag.trim();
+      if (trimmedTag && !labels.includes(trimmedTag)) {
+        labels.push(trimmedTag);
+      }
+    });
+  }
   
   // Create issue via GitHub API
   const response = await fetch(
@@ -251,6 +357,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const type = detectType(request.url);
     sendResponse({ type: type });
     return false;
+  }
+  
+  if (request.action === 'checkUrlExists') {
+    // Check if URL already exists
+    checkUrlExists(request.url)
+      .then((issue) => {
+        sendResponse({ exists: !!issue, issue: issue });
+      })
+      .catch((error) => {
+        console.error('Error checking URL:', error);
+        sendResponse({ exists: false, error: error.message });
+      });
+    return true;
   }
 });
 
