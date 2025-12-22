@@ -43,12 +43,14 @@ async function checkHealth() {
   try {
     const response = await chrome.runtime.sendMessage({ action: 'checkHealth' });
     
-    if (response.success) {
-      const backend = response.status.keyring_backend || 'Unknown';
+    if (response && response.success) {
+      const status = response.status || {};
+      const backend = status.keyring_backend || 'Unknown';
       updateHealthIndicator('healthy', `Connected (${backend})`);
       return true;
     } else {
-      updateHealthIndicator('unhealthy', `Connection failed: ${response.error}`);
+      const errorMsg = (response && response.error) || 'Connection failed';
+      updateHealthIndicator('unhealthy', `Connection failed: ${errorMsg}`);
       return false;
     }
   } catch (error) {
@@ -61,12 +63,17 @@ async function checkHealth() {
  * Load saved settings
  */
 async function loadSettings() {
-  chrome.storage.local.get(['githubOwner', 'githubRepo'], (result) => {
+  chrome.storage.local.get(['githubOwner', 'githubRepo', 'defaultTags'], (result) => {
     if (result.githubOwner) {
       document.getElementById('githubOwner').value = result.githubOwner;
     }
     if (result.githubRepo) {
       document.getElementById('githubRepo').value = result.githubRepo;
+    }
+    if (result.defaultTags) {
+      document.getElementById('defaultTags').value = Array.isArray(result.defaultTags) 
+        ? result.defaultTags.join(', ') 
+        : result.defaultTags;
     }
   });
 }
@@ -201,21 +208,46 @@ async function removePAT() {
   }
 }
 
-// Event listeners
-document.getElementById('saveRepoBtn').addEventListener('click', saveRepoSettings);
-document.getElementById('storePATBtn').addEventListener('click', storePAT);
-document.getElementById('testPATBtn').addEventListener('click', testPAT);
-document.getElementById('removePATBtn').addEventListener('click', removePAT);
-
-// Allow Enter key to save PAT
-document.getElementById('pat').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') {
-    storePAT();
-  }
-});
+/**
+ * Save Quick Save settings
+ */
+function saveQuickSaveSettings() {
+  const defaultTagsInput = document.getElementById('defaultTags').value.trim();
+  const defaultTags = defaultTagsInput 
+    ? defaultTagsInput.split(',').map(tag => tag.trim()).filter(tag => tag)
+    : [];
+  
+  chrome.storage.local.set({ defaultTags: defaultTags }, () => {
+    showStatus('quickSaveStatus', '✓ Default tags saved', 'success');
+  });
+}
 
 // Initialize on load
-document.addEventListener('DOMContentLoaded', () => {
+function initialize() {
+  // Load saved settings
   loadSettings();
+  
+  // Check health
   checkHealth();
-});
+  
+  // Setup event listeners
+  document.getElementById('saveRepoBtn').addEventListener('click', saveRepoSettings);
+  document.getElementById('storePATBtn').addEventListener('click', storePAT);
+  document.getElementById('testPATBtn').addEventListener('click', testPAT);
+  document.getElementById('removePATBtn').addEventListener('click', removePAT);
+  document.getElementById('saveQuickSaveBtn').addEventListener('click', saveQuickSaveSettings);
+  
+  // Allow Enter key to save PAT
+  document.getElementById('pat').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      storePAT();
+    }
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initialize);
+} else {
+  // DOM already loaded
+  initialize();
+}
