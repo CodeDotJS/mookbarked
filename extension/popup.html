@@ -259,6 +259,101 @@
       background: #fef3c7;
       color: #92400e;
     }
+    
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%);
+        color: #e5e5e5;
+      }
+      
+      .header {
+        border-bottom: 1px solid #333;
+      }
+      
+      .brand {
+        color: #e5e5e5;
+      }
+      
+      .health-status {
+        color: #999;
+      }
+      
+      label {
+        color: #b3b3b3;
+      }
+      
+      input[type="text"],
+      textarea {
+        background: #2a2a2a;
+        color: #e5e5e5;
+      }
+      
+      input[type="text"]:focus,
+      textarea:focus {
+        background: #333;
+      }
+      
+      input[type="text"][readonly] {
+        background: #252525;
+        color: #999;
+      }
+      
+      .tags-input-wrapper {
+        background: #2a2a2a;
+      }
+      
+      .tags-input-wrapper:focus-within {
+        background: #333;
+      }
+      
+      .tag {
+        background: #3a3a3a;
+        color: #d0d0d0;
+      }
+      
+      .tag-remove {
+        color: #aaa;
+      }
+      
+      .tag-remove:hover {
+        color: #ef4444;
+      }
+      
+      .provider-badge {
+        background: #3a3a3a;
+        color: #b3b3b3;
+      }
+      
+      button:disabled {
+        background: #3a3a3a;
+        color: #666;
+      }
+      
+      .status.success {
+        background: #1e3a2e;
+        color: #4ade80;
+      }
+      
+      .status.error {
+        background: #3a1e1e;
+        color: #f87171;
+      }
+      
+      .status.loading {
+        background: #1e2a3a;
+        color: #60a5fa;
+      }
+      
+      .status.duplicate {
+        background: #3a2e1e;
+        color: #fbbf24;
+      }
+      
+      .status.duplicate a {
+        color: #fbbf24;
+      }
+    }
   </style>
 </head>
 <body>
