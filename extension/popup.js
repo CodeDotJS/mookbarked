@@ -5,6 +5,7 @@
 
 let currentTab = null;
 let tags = [];
+let lastFailedBookmark = null; // Store last failed bookmark for retry
 
 /**
  * Show status message
@@ -240,6 +241,161 @@ async function undoLastSave(issueNumber) {
 }
 
 /**
+ * Replace existing bookmark with new data
+ * @param {number} issueNumber - Issue number to replace
+ * @param {string} url - URL
+ * @param {string} title - Title
+ * @param {string} type - Type
+ * @param {string} notes - Notes
+ * @param {Array} tags - Tags
+ */
+async function replaceExistingBookmark(issueNumber, url, title, type, notes, tags) {
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  showStatus('Replacing bookmark...', 'loading');
+  
+  try {
+    // Get provider
+    const provider = await detectProvider(url);
+    
+    const bookmark = {
+      title: title,
+      url: url,
+      type: type,
+      provider: provider,
+      notes: notes,
+      tags: tags
+    };
+    
+    // Update the existing issue
+    const response = await chrome.runtime.sendMessage({
+      action: 'updateBookmark',
+      issueNumber: issueNumber,
+      data: bookmark
+    });
+    
+    if (response.success) {
+      const undoMessage = `✓ Bookmark replaced! <a href="#" id="undoLink" style="color: #166534; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Undo</a>`;
+      showStatus(undoMessage, 'success', true);
+      
+      // Setup undo handler (close the issue)
+      document.getElementById('undoLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await undoLastSave(issueNumber);
+      });
+      
+      // Clear form fields
+      document.getElementById('notes').value = '';
+      tags = [];
+      renderTags();
+      
+      // Close popup after 5 seconds
+      setTimeout(() => {
+        window.close();
+      }, 5000);
+    } else {
+      const errorMessage = `✗ Error: ${response.error} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+      showStatus(errorMessage, 'error', true);
+      
+      document.getElementById('retryLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await replaceExistingBookmark(issueNumber, url, title, type, notes, tags);
+      });
+      
+      saveBtn.disabled = false;
+    }
+  } catch (error) {
+    const errorMessage = `✗ Error: ${error.message} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+    showStatus(errorMessage, 'error', true);
+    
+    document.getElementById('retryLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await replaceExistingBookmark(issueNumber, url, title, type, notes, tags);
+    });
+    
+    saveBtn.disabled = false;
+  }
+}
+
+/**
+ * Retry last failed save
+ */
+async function retryLastSave() {
+  if (!lastFailedBookmark) {
+    showStatus('No previous save to retry', 'error');
+    return;
+  }
+  
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  showStatus('Retrying save...', 'loading');
+  
+  try {
+    // Check for duplicates again
+    const existingIssue = await checkUrlExists(lastFailedBookmark.url);
+    
+    if (existingIssue) {
+      const issueLink = existingIssue.html_url || '#';
+      const message = `⚠ This URL already exists in <a href="${issueLink}" target="_blank" style="color: #92400e; text-decoration: underline; font-weight: 600; cursor: pointer;">issue #${existingIssue.number}</a>`;
+      showStatus(message, 'duplicate', true);
+      saveBtn.disabled = false;
+      lastFailedBookmark = null;
+      return;
+    }
+    
+    // Retry saving
+    const response = await chrome.runtime.sendMessage({
+      action: 'createBookmark',
+      data: lastFailedBookmark
+    });
+    
+    if (response.success) {
+      const issueNumber = response.issue.number;
+      const undoMessage = `✓ Bookmark saved! <a href="#" id="undoLink" style="color: #166534; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Undo</a>`;
+      showStatus(undoMessage, 'success', true);
+      
+      // Setup undo handler
+      document.getElementById('undoLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await undoLastSave(issueNumber);
+      });
+      
+      // Clear form fields
+      document.getElementById('notes').value = '';
+      tags = [];
+      renderTags();
+      lastFailedBookmark = null;
+      
+      // Close popup after 5 seconds
+      setTimeout(() => {
+        window.close();
+      }, 5000);
+    } else {
+      // Store failed bookmark again for another retry
+      const errorMessage = `✗ Error: ${response.error} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+      showStatus(errorMessage, 'error', true);
+      
+      document.getElementById('retryLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await retryLastSave();
+      });
+      
+      saveBtn.disabled = false;
+    }
+  } catch (error) {
+    const errorMessage = `✗ Error: ${error.message} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+    showStatus(errorMessage, 'error', true);
+    
+    document.getElementById('retryLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await retryLastSave();
+    });
+    
+    saveBtn.disabled = false;
+  }
+}
+
+/**
  * Handle form submission
  */
 document.getElementById('bookmarkForm').addEventListener('submit', async (e) => {
@@ -277,8 +433,15 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
     
     if (existingIssue) {
       const issueLink = existingIssue.html_url || '#';
-      const message = `⚠ This URL already exists in <a href="${issueLink}" target="_blank" style="color: #92400e; text-decoration: underline; font-weight: 600; cursor: pointer;">issue #${existingIssue.number}</a>`;
+      const message = `⚠ This URL already exists in <a href="${issueLink}" target="_blank" style="color: #92400e; text-decoration: underline; font-weight: 600; cursor: pointer;">issue #${existingIssue.number}</a>. <a href="#" id="replaceLink" style="color: #92400e; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Replace it?</a>`;
       showStatus(message, 'duplicate', true);
+      
+      // Setup replace handler
+      document.getElementById('replaceLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await replaceExistingBookmark(existingIssue.number, url, title, type, notes, tags);
+      });
+      
       saveBtn.disabled = false;
       return;
     }
@@ -327,11 +490,39 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
         window.close();
       }, 5000);
     } else {
-      showStatus(`✗ Error: ${response.error}`, 'error');
+      // Store failed bookmark for retry
+      lastFailedBookmark = bookmark;
+      const errorMessage = `✗ Error: ${response.error} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+      showStatus(errorMessage, 'error', true);
+      
+      // Setup retry handler
+      document.getElementById('retryLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await retryLastSave();
+      });
+      
       saveBtn.disabled = false;
     }
   } catch (error) {
-    showStatus(`✗ Error: ${error.message}`, 'error');
+    // Store failed bookmark for retry
+    lastFailedBookmark = {
+      title: title,
+      url: url,
+      type: type,
+      provider: provider,
+      notes: notes,
+      tags: tags
+    };
+    
+    const errorMessage = `✗ Error: ${error.message} <a href="#" id="retryLink" style="color: #991b1b; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Retry</a>`;
+    showStatus(errorMessage, 'error', true);
+    
+    // Setup retry handler
+    document.getElementById('retryLink').addEventListener('click', async (e) => {
+      e.preventDefault();
+      await retryLastSave();
+    });
+    
     saveBtn.disabled = false;
   }
 });
