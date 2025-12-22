@@ -299,5 +299,52 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
   }
 });
 
+/**
+ * Handle keyboard shortcuts
+ */
+document.addEventListener('keydown', (e) => {
+  // Escape: Close popup
+  if (e.key === 'Escape') {
+    window.close();
+    return;
+  }
+  
+  // Cmd/Ctrl + Enter or Cmd/Ctrl + S: Submit form (works everywhere including textarea/tags)
+  if ((e.metaKey || e.ctrlKey) && (e.key === 'Enter' || e.key === 's')) {
+    e.preventDefault();
+    const form = document.getElementById('bookmarkForm');
+    const saveBtn = document.getElementById('saveBtn');
+    
+    // Submit form even when in textarea or tags input
+    if (!saveBtn.disabled && form.checkValidity()) {
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+    return;
+  }
+  
+  // Enter: Submit form (when not in textarea or tags input)
+  if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+    const activeElement = document.activeElement;
+    
+    // Allow Enter in textarea (for new lines)
+    if (activeElement.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    // Allow Enter in tags input (for adding tags)
+    if (activeElement.id === 'tagsInput') {
+      return;
+    }
+    
+    // Submit form if Enter is pressed elsewhere
+    e.preventDefault();
+    const form = document.getElementById('bookmarkForm');
+    const saveBtn = document.getElementById('saveBtn');
+    if (!saveBtn.disabled && form.checkValidity()) {
+      form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+  }
+});
+
 // Initialize when popup opens
 document.addEventListener('DOMContentLoaded', initializePopup);
