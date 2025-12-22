@@ -231,6 +231,19 @@
       transform: none;
     }
     
+    #saveAllTabsBtn {
+      margin-top: 8px;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    }
+    
+    #saveAllTabsBtn:hover {
+      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    }
+    
+    #saveAllTabsBtn:disabled {
+      background: #cbd5e1;
+    }
+    
     .status {
       margin-top: 10px;
       padding: 8px 12px;
@@ -354,6 +367,7 @@
         color: #fbbf24;
       }
     }
+    
   </style>
 </head>
 <body>
@@ -406,6 +420,8 @@
     
     <button type="submit" id="saveBtn">Mook It</button>
   </form>
+  
+  <button type="button" id="saveAllTabsBtn">Mook All Tabs</button>
   
   <div class="status" id="status"></div>
   
