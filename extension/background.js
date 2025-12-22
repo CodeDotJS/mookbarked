@@ -633,6 +633,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     return true;
   }
+  
+  if (request.action === 'cacheBookmark') {
+    // Add bookmark to cache (for bulk save)
+    addToCache(request.url, request.issue);
+    sendResponse({ success: true });
+    return false;
+  }
 });
 
 /**
