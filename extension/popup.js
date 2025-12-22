@@ -149,6 +149,13 @@ async function detectType(url) {
  * Initialize popup with current tab data
  */
 async function initializePopup() {
+  // Reset form state
+  const form = document.getElementById('bookmarkForm');
+  delete form.dataset.issueNumber;
+  document.getElementById('saveBtn').textContent = 'Mook It';
+  tags = [];
+  renderTags();
+  
   // Check health first
   checkHealth();
   
@@ -159,6 +166,7 @@ async function initializePopup() {
   // Populate form
   document.getElementById('title').value = tab.title || '';
   document.getElementById('url').value = tab.url || '';
+  document.getElementById('notes').value = '';
   
   // Detect provider and type
   const provider = await detectProvider(tab.url);
@@ -237,6 +245,59 @@ async function undoLastSave(issueNumber) {
     }
   } catch (error) {
     showStatus(`✗ Error: ${error.message}`, 'error');
+  }
+}
+
+/**
+ * Load existing bookmark for editing
+ * @param {number} issueNumber - Issue number to edit
+ */
+async function loadBookmarkForEdit(issueNumber) {
+  try {
+    showStatus('Loading bookmark...', 'loading');
+    
+    const response = await chrome.runtime.sendMessage({
+      action: 'getBookmark',
+      issueNumber: issueNumber
+    });
+    
+    if (response.success) {
+      const bookmark = response.bookmark;
+      
+      // Populate form with existing data
+      document.getElementById('title').value = bookmark.title;
+      document.getElementById('url').value = bookmark.url;
+      document.getElementById('notes').value = bookmark.notes;
+      
+      // Set type
+      if (bookmark.type === 'video') {
+        document.getElementById('typeVideo').checked = true;
+      } else {
+        document.getElementById('typeArticle').checked = true;
+      }
+      
+      // Set tags
+      tags = bookmark.tags || [];
+      renderTags();
+      
+      // Update provider badge
+      document.getElementById('providerBadge').textContent = bookmark.provider;
+      
+      // Store issue number for update
+      document.getElementById('bookmarkForm').dataset.issueNumber = issueNumber;
+      
+      // Change button text
+      document.getElementById('saveBtn').textContent = 'Update Bookmark';
+      
+      showStatus('Bookmark loaded. Make your changes and click Update.', 'success');
+      
+      // Focus on title field
+      document.getElementById('title').focus();
+    } else {
+      showStatus(`Error: ${response.error}`, 'error');
+    }
+  } catch (error) {
+    showStatus(`Error: ${error.message}`, 'error');
   }
 }
 
@@ -424,7 +485,70 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
   
   // Disable button and show loading
   const saveBtn = document.getElementById('saveBtn');
+  const form = document.getElementById('bookmarkForm');
+  const issueNumber = form.dataset.issueNumber;
+  
   saveBtn.disabled = true;
+  
+  // Check if we're editing an existing bookmark
+  if (issueNumber) {
+    showStatus('Updating bookmark...', 'loading');
+    
+    try {
+      // Get provider
+      const provider = await detectProvider(url);
+      
+      const bookmark = {
+        title: title,
+        url: url,
+        type: type,
+        provider: provider,
+        notes: notes,
+        tags: tags
+      };
+      
+      // Update existing bookmark
+      const response = await chrome.runtime.sendMessage({
+        action: 'updateBookmark',
+        issueNumber: parseInt(issueNumber),
+        data: bookmark
+      });
+      
+      if (response.success) {
+        const undoMessage = `✓ Bookmark updated! <a href="#" id="undoLink" style="color: #166534; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Undo</a>`;
+        showStatus(undoMessage, 'success', true);
+        
+        // Setup undo handler
+        document.getElementById('undoLink').addEventListener('click', async (e) => {
+          e.preventDefault();
+          await undoLastSave(parseInt(issueNumber));
+        });
+        
+        // Clear edit mode
+        delete form.dataset.issueNumber;
+        saveBtn.textContent = 'Mook It';
+        
+        // Clear form fields
+        document.getElementById('notes').value = '';
+        tags = [];
+        renderTags();
+        
+        // Close popup after 5 seconds
+        setTimeout(() => {
+          window.close();
+        }, 5000);
+      } else {
+        showStatus(`✗ Error: ${response.error}`, 'error');
+        saveBtn.disabled = false;
+      }
+    } catch (error) {
+      showStatus(`✗ Error: ${error.message}`, 'error');
+      saveBtn.disabled = false;
+    }
+    return;
+  }
+  
+  // New bookmark - check for duplicates
   showStatus('Checking for duplicates...', 'loading');
   
   try {
@@ -433,8 +557,14 @@ document.getElementById('bookmarkForm').addEventListener('submit', async (e) => 
     
     if (existingIssue) {
       const issueLink = existingIssue.html_url || '#';
-      const message = `⚠ This URL already exists in <a href="${issueLink}" target="_blank" style="color: #92400e; text-decoration: underline; font-weight: 600; cursor: pointer;">issue #${existingIssue.number}</a>. <a href="#" id="replaceLink" style="color: #92400e; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Replace it?</a>`;
+      const message = `⚠ This URL already exists in <a href="${issueLink}" target="_blank" style="color: #92400e; text-decoration: underline; font-weight: 600; cursor: pointer;">issue #${existingIssue.number}</a>. <a href="#" id="editLink" style="color: #92400e; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Edit</a> or <a href="#" id="replaceLink" style="color: #92400e; text-decoration: underline; font-weight: 600; margin-left: 8px; cursor: pointer;">Replace</a>?`;
       showStatus(message, 'duplicate', true);
+      
+      // Setup edit handler
+      document.getElementById('editLink').addEventListener('click', async (e) => {
+        e.preventDefault();
+        await loadBookmarkForEdit(existingIssue.number);
+      });
       
       // Setup replace handler
       document.getElementById('replaceLink').addEventListener('click', async (e) => {
