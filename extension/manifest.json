@@ -7,7 +7,9 @@
   "permissions": [
     "nativeMessaging",
     "activeTab",
-    "storage"
+    "storage",
+    "contextMenus",
+    "notifications"
   ],
   
   "host_permissions": [
