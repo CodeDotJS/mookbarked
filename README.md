@@ -3,7 +3,7 @@
 Chrome extension that saves bookmarks as GitHub Issues. PAT stored in OS keychain via native messaging.
 
 
-<p align="center"><img src="media/screenshot.png" style="width:80%"></p>
+<p align="center"><img src="media/mook.png" style="width:80%"></p>
 
 
 ## Prerequisites
