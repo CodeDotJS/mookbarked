@@ -53,14 +53,24 @@ If you don't have the extension ID yet, run `./install.sh` and update the manife
 
 **6. Configure extension**
 
-1. Right-click the extension icon
-2. Click "Options"
-3. Enter your GitHub username and repository name
-4. Paste your Personal Access Token
-5. Click "Save PAT"
-6. Click "Test Connection" to verify
+1. Right-click the extension icon → "Options"
+2. Enter your GitHub username and repository name
+3. Paste your Personal Access Token and click "Save PAT"
+4. (Optional) Set default tags for quick save
+5. Click "Test Connection" to verify
 
 **Done!** Click the extension icon on any page to save a bookmark.
+
+## Features
+
+- **Save bookmarks** as GitHub Issues with YAML frontmatter
+- **Tags support** - Add tags that become GitHub issue labels
+- **Duplicate detection** - Prevents saving the same URL twice
+- **Edit bookmarks** - Update existing bookmarks when duplicate found
+- **Quick save** - Right-click → "Quick Save with MookBarked" (uses default tags)
+- **Save all tabs** - Bulk save all tabs in current window
+- **Dark mode** - Automatically respects system theme
+- **Keyboard shortcuts** - `Cmd/Ctrl+Enter` or `Cmd/Ctrl+S` to save, `Esc` to close
 
 ## Testing
 
