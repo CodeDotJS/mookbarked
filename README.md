@@ -1,5 +1,3 @@
-# MookBarked
-
 <p align="center">
   <img style="width:40%; border-radius:100%" src="media/mookbarked-again.jpeg">
 </p>
