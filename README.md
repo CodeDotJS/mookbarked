@@ -1,5 +1,9 @@
 # MookBarked
 
+<p align="center">
+  <img style="width:40%; border-radius:100%" src="media/mookbarked-again.jpeg">
+</p>
+
 Chrome extension that saves bookmarks as GitHub Issues. PAT stored in OS keychain via native messaging.
 
 
